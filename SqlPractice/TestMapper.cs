@@ -9,24 +9,24 @@ namespace SqlPractice
     public class TestMapper<T>
         where T : class
     {
-        private static Dictionary<Type, Dictionary<string, PropertyInfo>> _EntityColumnCaches = new Dictionary<Type, Dictionary<string, PropertyInfo>>();
+        private static Dictionary<Type, Dictionary<string, PropertyAccessor>> _EntityColumnCaches = new Dictionary<Type, Dictionary<string, PropertyAccessor>>();
 
-        private static Dictionary<string, PropertyInfo> GetColumnInfos(Type entityType)
+        private static Dictionary<string, PropertyAccessor> GetColumnInfos(Type entityType)
         {
             lock (_EntityColumnCaches)
             {
-                Dictionary<string, PropertyInfo> entityColumnInfos = null;
+                Dictionary<string, PropertyAccessor> entityColumnInfos = null;
 
                 if (_EntityColumnCaches.TryGetValue(entityType, out entityColumnInfos) == false)
                 {
-                    entityColumnInfos = new Dictionary<string, PropertyInfo>();
+                    entityColumnInfos = new Dictionary<string, PropertyAccessor>();
 
                     foreach (var property in entityType.GetProperties())
                     {
                         var attr = property.GetCustomAttribute<TableColumnAttribute>();
                         var propertyName = (attr != null) ? attr.Name : property.Name;
 
-                        entityColumnInfos.Add(propertyName, property);
+                        entityColumnInfos.Add(propertyName, new PropertyAccessor(entityType, property.Name));
                     }
 
                     _EntityColumnCaches.Add(entityType, entityColumnInfos);
@@ -42,7 +42,7 @@ namespace SqlPractice
 
         private bool _IsInitialReader = false;
 
-        private Dictionary<string, PropertyInfo> _ColInfos;
+        private Dictionary<string, PropertyAccessor> _ColInfos;
 
 
         public TestMapper()
@@ -66,7 +66,7 @@ namespace SqlPractice
                 {
                     var columnName = reader.GetName(i);
 
-                    PropertyInfo entityProperty;
+                    PropertyAccessor entityProperty;
                     if (entityColumnInfos.TryGetValue(columnName, out entityProperty))
                     {
                         entityProperty.SetValue(entity, reader[i]);
