@@ -26,35 +26,70 @@ namespace SqlPractice
                         var attr = property.GetCustomAttribute<TableColumnAttribute>();
                         var propertyName = (attr != null) ? attr.Name : property.Name;
 
-                        entityColumnInfos.Add(attr.Name, property);
+                        entityColumnInfos.Add(propertyName, property);
                     }
+
+                    _EntityColumnCaches.Add(entityType, entityColumnInfos);
                 }
 
                 return entityColumnInfos;
             }
         }
 
+        private Type _EntityType;
+
+        private List<string> _ReaderCache;
+
+        private bool _IsInitialReader = false;
+
+        private Dictionary<string, PropertyInfo> _ColInfos;
+
+
+        public TestMapper()
+        {
+            _EntityType = typeof(T);
+            _ColInfos = GetColumnInfos(_EntityType);
+        }
+
 
         public T MapRow(IDataReader reader)
         {
-            var entityType = typeof(T);
-            var entityColumnInfos = GetColumnInfos(entityType);
+            var entityColumnInfos = _ColInfos;
+            var entity = (T)Activator.CreateInstance(_EntityType);
 
-            var count = reader.FieldCount;
-            var entity = (T)Activator.CreateInstance(entityType);
-
-            for (int i = 0; i < count; i++)
+            if (_IsInitialReader == false)
             {
-                var columnName = reader.GetName(i);
+                var count = reader.FieldCount;
+                _ReaderCache = new List<string>();
 
-                PropertyInfo entityProperty;
-                if (entityColumnInfos.TryGetValue(columnName, out entityProperty))
+                for (int i = 0; i < count; i++)
                 {
-                    entityProperty.SetValue(entity, reader[i]);
+                    var columnName = reader.GetName(i);
+
+                    PropertyInfo entityProperty;
+                    if (entityColumnInfos.TryGetValue(columnName, out entityProperty))
+                    {
+                        entityProperty.SetValue(entity, reader[i]);
+                        _ReaderCache.Add(columnName);
+                    }
+                }
+
+                _IsInitialReader = true;
+            }
+            else
+            {
+                var count = _ReaderCache.Count;
+
+                for (int i = 0; i < count; i++)
+                {
+                    var columnName = _ReaderCache[i];
+                    entityColumnInfos[columnName].SetValue(entity, reader[i]);
                 }
             }
 
+
             return entity;
         }
+
     }
 }
